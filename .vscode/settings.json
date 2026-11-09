@@ -12,7 +12,7 @@
         "service": "iris",
         "internalPort": 52773
       },
-      "active": true,
+      "active": false,
       "links": {
         "Error Log": "${serverUrl}/csp/sys/op/UtilSysAppErrorNamespaces.csp",
         "Swagger": "${serverUrl}/swagger-ui/index.html",

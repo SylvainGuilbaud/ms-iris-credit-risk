@@ -4,8 +4,11 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: always
+    container_name: iris-ms-credit-risk
+    hostname: iris-ms-credit-risk
     environment:
       - ISC_CPF_MERGE_FILE=/home/irisowner/dev/merge.cpf
+      - TZ=Europe/Paris
     networks:
         - ms-credit-risk-network    
     ports:
