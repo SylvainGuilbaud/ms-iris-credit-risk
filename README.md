@@ -33,7 +33,7 @@ Import the postman collection https://github.com/yurimarx/ms-iris-credit-risk/bl
 ## How to Test it - Kafka API
 
 1. Open and Start the production http://localhost:52795/csp/user/EnsPortal.ProductionConfig.zen?PRODUCTION=dc.creditrisk.CreditRiskProduction
-2. Open Kafka UI: http://localhost:8080/
+2. Open Kafka UI: http://localhost:18080/
 3. Go to Topics and create a CreditRiskInTopic if not exists.
 4. Click the CreditRiskInTopic link and click Produce Message (on the top right corner of the page)
 5. Fills iris into Key and the following json data into Value:
@@ -53,6 +53,17 @@ Import the postman collection https://github.com/yurimarx/ms-iris-credit-risk/bl
 8. Go to Messages and see the response message sent
 9. See the request and response flow on the Interoperabitiy production also. 
 
+
+## Python version (intersystems-pyprod)
+
+`python/creditrisk_pyprod.py` re-implements the Kafka Business Service and Business Process in pure Python with [intersystems-pyprod](https://pypi.org/project/intersystems-pyprod/). It also defines a Python production, `dc.creditrisk.pyprod.CreditRiskPyProduction`.
+
+```
+pip install intersystems-pyprod
+intersystems_pyprod /full/path/to/python/creditrisk_pyprod.py
+```
+
+Set the IRIS connection environment variables first (see the pyprod installing guide). Both productions use the same Kafka topics, so run only one at a time.
 
 ### References
 
