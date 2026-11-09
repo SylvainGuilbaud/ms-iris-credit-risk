@@ -26,10 +26,17 @@ from intersystems_pyprod import (
 
 iris_package_name = "dc.creditrisk.pyprod"
 
-TARGET_SETTING = (
-    "Basic:selector?context={Ens.ContextSearch/ProductionItems"
-    "?targets=1&productionName=@productionId}"
-)
+# Production Configuration draws a connector line between two items only for
+# properties typed Ens.DataType.ConfigName. pyprod maps every datatype it does
+# not know to %VarString, so register this one while the classes are generated.
+# NOTE: pyprod reads IRISProperty/IRISParameter arguments from the source text
+# (AST), so they must be literals, not variables.
+try:
+    from intersystems_pyprod import _parser
+
+    _parser.DATATYPE_MAP.setdefault("Ens.DataType.ConfigName", "Ens.DataType.ConfigName")
+except ImportError:  # not running under the intersystems_pyprod loader
+    pass
 
 PREDICT_SQL = (
     "SELECT PREDICT(CreditRiskModel) AS RiskPrediction, "
@@ -44,19 +51,42 @@ FEATURES = (
 )
 
 
+def target_exists(target: str) -> bool:
+    """True if `target` is a config item of the active production."""
+    production = iris.cls("Ens.Director").GetActiveProductionName()
+    rs = iris.sql.exec(
+        "SELECT 1 FROM Ens_Config.Item WHERE Production = ? AND Name = ?",
+        production,
+        target,
+    )
+    return next(iter(rs), None) is not None
+
+
+def alert_missing_target(host: str, target: str):
+    """Raise an IRIS alert (Ens.Alert) and return an error status."""
+    message = f"{host}: target '{target}' does not exist in the production"
+    IRISLog.Alert(message)
+    return Status.ERROR(message)
+
+
 class CreditRiskPredictService(BusinessService):
     """Reads Kafka messages and forwards the payload to the target process."""
 
     ADAPTER = IRISParameter("EnsLib.Kafka.InboundAdapter")
 
     target_config_name: str = IRISProperty(
-        default="CreditRiskProcess",
+        # pyprod only quotes the default of %VarString properties, so quote it here
+        default='"CreditRiskProcess"',
+        datatype="Ens.DataType.ConfigName",
         description="Config name of the business process receiving the Kafka payload",
-        settings=TARGET_SETTING,
+        settings="Basic:selector?context={Ens.ContextSearch/ProductionItems?targets=1&productionName=@productionId}",
     )
 
     def OnProcessInput(self, input):
         # input is an EnsLib.Kafka.Message
+        if not target_exists(self.target_config_name):
+            return alert_missing_target("CreditRiskPredictService", self.target_config_name)
+
         request = iris.cls("Ens.StringRequest")._New()
         request.StringValue = input.value
 
@@ -71,13 +101,17 @@ class CreditRiskProcess(BusinessProcess):
     """Runs the IntegratedML prediction and publishes the result to Kafka."""
 
     target_config_name: str = IRISProperty(
-        default="CreditRiskOperation",
+        default='"CreditRiskOperation"',
+        datatype="Ens.DataType.ConfigName",
         description="Config name of the business operation publishing to Kafka",
-        settings=TARGET_SETTING,
+        settings="Basic:selector?context={Ens.ContextSearch/ProductionItems?targets=1&productionName=@productionId}",
     )
 
     def OnRequest(self, request):
         try:
+            if not target_exists(self.target_config_name):
+                return alert_missing_target("CreditRiskProcess", self.target_config_name)
+
             data = json.loads(request.StringValue)
 
             rs = iris.sql.exec(PREDICT_SQL, *[data.get(f) for f in FEATURES])
