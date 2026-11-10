@@ -10,22 +10,18 @@
     set prop("AutheEnabled")=48
     do ##class(Security.Services).Modify("%Service_CallIn",.prop)
 
-    ; pyprod: install intersystems-pyprod in a virtual environment
-    set venv="/home/irisowner/pyprod-venv"
+    ; pyprod: the venv /opt/pyprod-venv (with intersystems-pyprod) is created as root in the Dockerfile
+    set venv="/opt/pyprod-venv"
     set sitepkg=venv_"/lib/python3.12/site-packages"
-    set sc=$ZF(-100,"/SHELL","python3","-m","venv",venv)
-    write "venv exit code: ",sc,!
-    set sc=$ZF(-100,"/SHELL",venv_"/bin/pip","install","intersystems-pyprod")
-    write "pip install intersystems-pyprod exit code: ",sc,!
     ; make the venv visible to embedded Python (used at runtime by the generated classes)
-    zn "%SYS"
     set p("PythonPath")=sitepkg
     set sc=##class(Config.config).Modify(.p)
     write "PythonPath set status: ",sc,!
-    ; generate and load the Python Business Service / Process / Production classes.
-    ; irispython does not read PythonPath, so the venv is put on sys.path before calling the intersystems_pyprod entry point (_parser:main)
+    ; generate and load the Python Business Service / Process / Production classes with the venv's intersystems_pyprod script.
+    ; Run through irispython (the only interpreter that can compile classes in this instance): the venv is added with site.addsitedir,
+    ; then the venv's own bin/intersystems_pyprod script is executed as __main__
     set env="IRISINSTALLDIR=/usr/irissys IRISUSERNAME=_SYSTEM IRISPASSWORD=SYS IRISNAMESPACE=USER"
-    set cmd="import sys; sys.path.insert(0,"""_sitepkg_"""); from intersystems_pyprod._parser import main; main()"
+    set cmd="import site, runpy; site.addsitedir("""_sitepkg_"""); runpy.run_path("""_venv_"/bin/intersystems_pyprod"", run_name=""__main__"")"
     set sc=$ZF(-100,"/SHELL","env",$piece(env," ",1),$piece(env," ",2),$piece(env," ",3),$piece(env," ",4),"irispython","-c",cmd,"/home/irisowner/dev/python/creditrisk_pyprod.py")
     write "pyprod load exit code: ",sc,!
 

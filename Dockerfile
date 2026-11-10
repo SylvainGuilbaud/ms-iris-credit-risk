@@ -17,6 +17,13 @@ ENV PATH="/usr/irissys/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sb
 
 COPY .iris_init /home/irisowner/.iris_init
 
+## pyprod: virtual environment created as root (outside irisowner's home), readable by everyone
+USER root
+RUN python3 -m venv /opt/pyprod-venv && \
+    /opt/pyprod-venv/bin/pip install --no-cache-dir intersystems-pyprod && \
+    chmod -R a+rX /opt/pyprod-venv
+USER irisowner
+
 RUN --mount=type=bind,src=.,dst=. \
     iris start IRIS && \
 	iris session IRIS < iris.script && \
